@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="1fe8de8c-2635-404d-b314-ff283120bca5" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<validation:config name="Validation_Config" doc:name="Validation Config" doc:id="f6448353-5848-4ad8-a72a-827449d6ac5f" />
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="e2cce3c9-b49b-4d10-add0-0f35e1e8c591" >
+		<db:oracle-connection host="localhost" user="muledemo" password="muledemo" instance="xe" />
+	</db:config>
+	<flow name="errorhandling2Flow" doc:id="3d19c2e8-3a52-4dc0-bea3-ca8d3db936f4" >
+		<http:listener doc:name="Listener" doc:id="58f641e5-3dfc-4cb5-9a1f-e7291ae62b43" config-ref="HTTP_Listener_config" path="/error">
+			<http:error-response >
+				<http:body ><![CDATA[#[payload]]]></http:body>
+			</http:error-response>
+		</http:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="7ae604f4-7529-42c2-b2c7-3f5aaa78fc70" message="***********FLOW STARTED"/>
+		<set-payload value="300" doc:name="Set Payload" doc:id="4de66f93-29eb-47c1-8f90-2bba40657324" />
+		<validation:is-number numberType="INTEGER" doc:id="d77ec27a-81be-46dc-8cb3-82044ff2ec4f" config-ref="Validation_Config" value="#[payload]"/>
+		<db:select doc:id="d0d7616f-7a2d-4317-96f9-b5b7a0d31ab5" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from employ12]]></db:sql>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="da9b051c-8e2c-4b15-861e-0707faacfc3f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler>
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="37f41425-4580-489d-9929-5c5465e30e00" type="VALIDATION:INVALID_NUMBER, EXPRESSION, STREAM_MAXIMUM_SIZE_EXCEEDED">
+				<set-payload value="Error reused in flow on error continue scope" doc:name="Set Payload" doc:id="036b1d8c-20bc-48ff-8c11-07ec5b3f4f5a" />
+			</on-error-continue>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="5b0cb84f-b562-44d6-a3e2-eb1ad40cb643" type="DB:BAD_SQL_SYNTAX, DB:QUERY_EXECUTION">
+				<ee:transform doc:name="Transform Message" doc:id="e7e1438c-7306-4911-b7e8-71ea91628909" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "database error"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>
